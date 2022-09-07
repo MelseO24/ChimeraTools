@@ -1,8 +1,9 @@
 #! /home/omelse/anaconda3/envs/EnvPy38/bin/python3
 #Author: Okke Melse
 #Last modified: 2022-09-06
-import io
-import os
+import copy
+import re
+
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
 import base64
@@ -103,13 +104,17 @@ def parse_fasta(filename, translate=False):
 
     with open("tmp-collectedFastaFiles.fasta", "w") as fwrite:
         for name in filename:
-            tmpSeq = SeqIO.parse(name, "fasta")
+            all_sequences = SeqIO.parse(name, "fasta")
             record: SeqRecord
-            for record in tmpSeq:
+            for record in all_sequences:
                 if translate:
-                    record.seq = record.seq[record.seq.find("ATG"):]
-                    record.seq = record.translate(to_stop=True).seq
-                    fwrite.write(record.format("fasta"))
+                    record_copy: SeqRecord
+                    record_copy = copy.deepcopy(record)
+                    for rf_counter, readingFrame in enumerate([m.start() for m in re.finditer("ATG", str(record.seq))]):
+                        record_copy.seq = record.seq[readingFrame:]
+                        record_copy.seq = record_copy.translate(to_stop=True).seq
+                        record_copy.id = record.id + f"-rf{rf_counter+1}"
+                        fwrite.write(record_copy.format("fasta"))
                 else:
                     fwrite.write(record.format("fasta"))
     libraryseqs = sequence_info("tmp-collectedFastaFiles.fasta")
