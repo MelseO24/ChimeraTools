@@ -3,7 +3,6 @@
 #Last modified: 2022-09-06
 import copy
 import re
-
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
 import base64
@@ -65,8 +64,10 @@ def parse_ab1(filename):
     if type(filename) == str:
         filename = [filename]
     for name in filename:
-        trace.append(_parse_single_ab1(name))
-        tmpfasta.append(SeqRecord(trace[-1]["FASTA_AA"], id=name))
+        newtrace, readingFrames = _parse_single_ab1(name)
+        trace.append(newtrace)
+        for frame in readingFrames:
+            tmpfasta.append(frame)
     # write all sequences concenated in one fasta file
     with open("tmp-collectedFastaFiles.fasta", "w") as f:
         for seq in tmpfasta:
@@ -85,9 +86,18 @@ def _parse_single_ab1(filename):
     record = SeqIO.read(filename, "abi")
     for channelNr, data in enumerate(["DATA9","DATA10","DATA11","DATA12"]):
         trace[f"CHANNEL{channelNr+1}"] = record.annotations["abif_raw"][data]
-    trace["FASTA_DNA"] = record.seq[record.seq.find("ATG"):]  #start at ATG (startcodon)
-    trace["FASTA_AA"] = trace["FASTA_DNA"].translate(to_stop=True)  # from starting Met to stop-codon
-    return trace
+
+    # Translate all reading frames
+    translated_seqs = [] # list of seqrecords with all reading frames
+    record_copy: SeqRecord
+    record_copy = copy.deepcopy(record)
+    for rf_counter, readingFrame in enumerate([m.start() for m in re.finditer("ATG", str(record.seq))]):
+        record_copy.letter_annotations = {}
+        record_copy.seq = record.seq[readingFrame:]
+        record_copy.seq = record_copy.translate(to_stop=True).seq
+        record_copy.id = record.id + f"-rf{rf_counter+1}"
+        translated_seqs.append(copy.deepcopy(record_copy))
+    return trace, translated_seqs
 
 def parse_fasta(filename, translate=False):
     """
@@ -243,7 +253,6 @@ def update_filenames(ab1filenames=None, libraryfilename=None):
 def process_seqalignment(n_clicks, ab1files, libraryfile, ab1filenames, libraryfilename, seq_fmt):
 
     filetype = "text" if seq_fmt == "fasta" else "binary"
-    Returnmsg = [""]
 
     # Step 0: Some checks
     if None in [ab1files, libraryfile]:
@@ -253,7 +262,7 @@ def process_seqalignment(n_clicks, ab1files, libraryfile, ab1filenames, libraryf
     try:
         _localfilenames_sequencing = save_multiple_files(ab1files, ab1filenames, filetype)
     except:
-        return ["","Sequencing file could not be parsed, check if you uploaded a valid fasta file."]
+        return ["","Sequencing file could not be saved to disk, check if you selected the correct file type."]
 
     # Step 1b: Parse sequencing (DNA) ABI/FASTA file to disk
     seq_sequencing: sequence_info
