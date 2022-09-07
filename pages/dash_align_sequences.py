@@ -1,7 +1,7 @@
 #! /home/omelse/anaconda3/envs/EnvPy38/bin/python3
 #Author: Okke Melse
 #Last modified: 2022-09-06
-
+import io
 import os
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
@@ -55,7 +55,7 @@ def parse_ab1(filename):
     Parses ABI file(s) in biopython SeqIO record, and returns dictionary with channel readouts and FASTA
     :param filename: ABI filename (get from process_ab1)
     :return: list(dict(["CHANNEL1","CHANNEL2","CHANNEL3","CHANNEL4","FASTA_DNA","FASTA_AA"]))
-    :return: SeqRecord with parsed sequences
+    :return: sequence_info with parsed sequences
     """
     # Process trace file in biopython
     # trace = dict.fromkeys(["CHANNEL1","CHANNEL2","CHANNEL3","CHANNEL4"])
@@ -96,7 +96,7 @@ def parse_fasta(filename, translate=False):
     :type translate: bool
     :return: sequence_info with parsed sequences
     """
-    libraryseqs: SeqRecord
+    libraryseqs: sequence_info
     # concentate file contents in a single file
     if type(filename) == str:
         filename = [filename]
@@ -142,7 +142,7 @@ layout = dbc.Container([
 
         dcc.Upload(id="upload-ab1",
                    children=html.Div([
-                       'DNA sequencing ABI/Fasta File  (Drag and Drop or click to Select Files)'
+                       'DNA sequencing ABI/fasta File  (Drag and Drop or click to Select Files)'
                    ]),
                    style={'width': '100%',
                           'height': '60px',
@@ -202,6 +202,8 @@ layout = dbc.Container([
                    className="d-grid gap-2")
     ]),
 
+        html.Div([dcc.Download(id="downloadAlignment")]),
+
         html.Div(id="output_container_seqAlign",
                  style={"whiteSpace": "pre", "color": "red"}),
 
@@ -223,7 +225,8 @@ def update_filenames(ab1filenames=None, libraryfilename=None):
 
 # Callback to perform analysis
 @dash.callback(
-    [Output(component_id='output_container_seqAlign', component_property="children")],
+    [Output(component_id='downloadAlignment', component_property='data'),
+     Output(component_id='output_container_seqAlign', component_property="children")],
     [Input(component_id='submit-button2', component_property='n_clicks')],
     [State(component_id='upload-ab1', component_property='contents'),
      State(component_id='upload-library', component_property='contents'),
@@ -245,7 +248,7 @@ def process_seqalignment(n_clicks, ab1files, libraryfile, ab1filenames, libraryf
     try:
         _localfilenames_sequencing = save_multiple_files(ab1files, ab1filenames, filetype)
     except:
-        return ["Sequencing file could not be parsed, check if you uploaded a valid fasta file."]
+        return ["","Sequencing file could not be parsed, check if you uploaded a valid fasta file."]
 
     # Step 1b: Parse sequencing (DNA) ABI/FASTA file to disk
     seq_sequencing: sequence_info
@@ -253,12 +256,12 @@ def process_seqalignment(n_clicks, ab1files, libraryfile, ab1filenames, libraryf
         try:
             traces, seq_sequencing = parse_ab1(_localfilenames_sequencing)
         except:
-            return ["Sequencing file (AB1) could not be translated, probably no start codon was found."]
+            return ["","Sequencing file (AB1) could not be translated, probably no start codon was found."]
     else: #seq_fmt == "fasta"
         try:
             seq_sequencing = parse_fasta(_localfilenames_sequencing, translate=True)
         except:
-            return ["Sequencing file (fasta) could not be translated, probably no start codon was found."]
+            return ["","Sequencing file (fasta) could not be translated, probably no start codon was found."]
 
     # Step 2: Save and parse library FASTA files to disk
     _localfilename_library = save_file(libraryfile, libraryfilename)
@@ -268,9 +271,16 @@ def process_seqalignment(n_clicks, ab1files, libraryfile, ab1filenames, libraryf
     dataLibrary = []
     record: SeqRecord
     for record in seq_library:
-        dataLibrary.append([record.id, record.seq])
+        matched_seq = ["No match", ""]  # [seqid, translated sequence]
+        for seqid in seq_sequencing.get_all_ids():
+            if seq_sequencing.get_seq(seqid) == record.seq:
+                matched_seq = [seqid, seq_sequencing.get_seq(seqid)]
+        dataLibrary.append([record.id,
+                            matched_seq[0],  # seqid of matched sequencing result
+                            record.seq,      # expected sequence from library
+                            matched_seq[1]]) # translated sequence from sequencing result
 
-    df = pd.DataFrame(dataLibrary, columns=["Chimera", "Sequence"])
+    df = pd.DataFrame(dataLibrary, columns=["Chimera", "Matched sequencing id", "Expected sequence (library)", "Translated sequencing result"])
 
-
-    return [f"{Returnmsg}\n\nTranslated Amino Acid sequence shown below."]
+    return [dict(content=df.to_csv(index=False), filename="LibrarySequencingAnalysis.csv"),
+            "Alignment successful, result will be downloaded automatically"]
