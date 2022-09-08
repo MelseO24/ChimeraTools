@@ -140,8 +140,8 @@ def create_chimeric_sequence(parent_seq1, parent_seq2, crossover_pts):
 # Build your components
 app = Dash(external_stylesheets=([dbc.themes.COSMO]))
 dash.register_page(__name__,
-                   title="Chimeric fasta",
-                   name="In silico crossover")
+                   title="crossover_single",
+                   name="In silico crossover - single")
 
 # Customize your own Layout
 layout = dbc.Container(

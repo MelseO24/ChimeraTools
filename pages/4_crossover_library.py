@@ -120,8 +120,8 @@ def calc_library(msa, crossPts, label="full"):
 # Build components
 app = Dash(external_stylesheets=([dbc.themes.COSMO]))
 dash.register_page(__name__,
-                   title="Chimeric Library",
-                   name="In silico library generation for chimeric proteins")
+                   title="crossover_library",
+                   name="In silico crossover - library")
 
 # Customize your own Layout
 layout = dbc.Container(

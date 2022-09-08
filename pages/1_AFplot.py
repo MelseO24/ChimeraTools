@@ -48,6 +48,12 @@ dash.register_page(__name__,
                    name="Generate Alphafold IDDT plot")
 
 layout = dbc.Container([
+
+    html.Div(
+        html.H1("Plot confidentiality score from AlphaFold structures", style={'ext-align': 'center'})),
+
+    html.Br(),
+
     html.Div([
         html.P(["Enter here the PDB file with IDDT values in B-factor column. Processing will start automatically after upload, please not this may take a couple of seconds.", html.Br()]),
         dcc.Upload(id="upload-pdb",

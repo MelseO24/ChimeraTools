@@ -5,50 +5,17 @@ import copy
 import re
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
-import base64
 import dash
 from dash import Dash, dcc, Output, Input, State, html, ctx, dash_table
 import dash_bootstrap_components as dbc
 import matplotlib
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from utils.sequtils import sequence_info
+from utils.fileutils import _write_file, save_file, save_multiple_files
 import pandas as pd
+matplotlib.use("Agg")
 
 # This script aligns all sequenced genes to the library
-
-def _write_file(filename, value):
-    with open(filename, "w") as f:
-        f.write(value)
-
-def save_file(file, filename, filetype='text'):
-    """
-    Saves uploaded file to disk
-    :param file:
-    :param filetype: 'text' or 'binary' (NOTE: ABI is binary!)
-    :return: filename of fasta file on disk
-    """
-    content_type, content = file.split(',')
-    decoded_file = base64.b64decode(content)
-    if filetype == "text":
-        with open(f"tmp-{filename}", "w") as f:
-            f.write(decoded_file.decode("utf-8"))
-    elif filetype == "binary":
-        with open(f"tmp-{filename}", "wb") as f:
-            f.write(decoded_file)
-    return f"tmp-{filename}"
-
-def save_multiple_files(files, filenames, filetype='text'):
-    """
-    Saves uploaded files to disk
-    :param filenames: list of files
-    :param filetype: 'text' or 'binary' (NOTE: ABI is binary!)
-    :return localfilenames: list of filenames on local disk
-    """
-    localfilenames = []
-    for file, filename in zip(files, filenames):
-        localfilenames.append(save_file(file, filename, filetype))
-    return localfilenames
 
 def parse_ab1(filename):
     """
@@ -64,9 +31,9 @@ def parse_ab1(filename):
     if type(filename) == str:
         filename = [filename]
     for name in filename:
-        newtrace, readingFrames = _parse_single_ab1(name)
+        newtrace, ORFs = _parse_single_ab1(name)
         trace.append(newtrace)
-        for frame in readingFrames:
+        for frame in ORFs:
             tmpfasta.append(frame)
     # write all sequences concenated in one fasta file
     with open("tmp-collectedFastaFiles.fasta", "w") as f:
@@ -95,7 +62,7 @@ def _parse_single_ab1(filename):
         record_copy.letter_annotations = {}
         record_copy.seq = record.seq[readingFrame:]
         record_copy.seq = record_copy.translate(to_stop=True).seq
-        record_copy.id = record.id + f"-rf{rf_counter+1}"
+        record_copy.id = record.id + f"-orf{rf_counter+1}"
         translated_seqs.append(copy.deepcopy(record_copy))
     return trace, translated_seqs
 
@@ -123,7 +90,7 @@ def parse_fasta(filename, translate=False):
                     for rf_counter, readingFrame in enumerate([m.start() for m in re.finditer("ATG", str(record.seq))]):
                         record_copy.seq = record.seq[readingFrame:]
                         record_copy.seq = record_copy.translate(to_stop=True).seq
-                        record_copy.id = record.id + f"-rf{rf_counter+1}"
+                        record_copy.id = record.id + f"-orf{rf_counter+1}"
                         fwrite.write(record_copy.format("fasta"))
                 else:
                     fwrite.write(record.format("fasta"))
@@ -149,6 +116,12 @@ dash.register_page(__name__,
 
 # Customize your own Layout
 layout = dbc.Container([
+
+    html.Div(
+        html.H1("Analyze library sequencing results", style={'ext-align': 'center'})),
+
+    html.Br(),
+
     html.Div([
 
         html.P([
