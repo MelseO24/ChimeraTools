@@ -5,7 +5,8 @@ Created on Tue Jul 12 15:22:10 2022
 @author: Okke
 """
 
-import sys
+import random
+import string
 import os
 import re
 import itertools
@@ -159,7 +160,7 @@ layout = dbc.Container(
                      value="short",
                      className="d-grid gap-2",
                      clearable=False,
-                     style={"width": '80%'}
+                     style={"width": '50%'}
                      ),
 
         # submit button
@@ -176,7 +177,8 @@ layout = dbc.Container(
         html.Br(),
         #Write cutting points
         html.Div(id='output_container1',
-                 style={"whiteSpace" : "pre"})
+                 style={"whiteSpace" : "pre",
+                        "color": "red"})
 
     ]),
 
@@ -192,15 +194,25 @@ layout = dbc.Container(
     prevent_initial_call=True,
 )
 def create_library(n_clicks, msa_input, crossPts_input, alignment_format, annotation):
-    write_file("tmp-msa.aln", msa_input)
+    session_id = (''.join(random.choice(string.ascii_lowercase) for i in range(10)))
+
+    if not alignment_format:
+        return ["", "ERROR: please select an alignment format from the drop-down menu"]
+    elif not crossPts_input:
+        return ["", "ERROR: please provide the crossover positions"]
+    elif len(crossPts_input.split(",")) < 2:
+        return ["", "ERROR: provide at least two crossover points, otherwise use the 'In silico crossover - single' script"]
+
+    write_file(f"tmpFiles/{session_id}-msa.aln", msa_input)
     try:
-        align = AlignIO.read("tmp-msa.aln", alignment_format.lower())
+        align = AlignIO.read(f"tmpFiles/{session_id}-msa.aln", alignment_format.lower())
     except ValueError:
-        os.remove("tmp-msa.aln")
-        return("", f"Error: MSA could not be parsed as {alignment_format} alignment. Are you sure you provided the correct format?\n")
-    os.remove("tmp-msa.aln")
+        os.remove(f"tmpFiles/{session_id}-msa.aln")
+        return ["", f"ERROR: MSA could not be parsed as {alignment_format} alignment. Are you sure you provided the correct format?\n"]
+    os.remove(f"tmpFiles/{session_id}-msa.aln")
     crossPts_input = crossPts_input.split(",")
     crossPts = [int(x)-1 for x in crossPts_input]
+    crossPts.sort()
 
     return [dict(content=calc_library(align, crossPts, annotation), filename="library_chimeras.fasta"),
             f"Calculation successful. Created {len(align) ** (len(crossPts)+1)} new sequences.\n"

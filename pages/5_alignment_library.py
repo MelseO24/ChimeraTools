@@ -1,6 +1,8 @@
 #! /home/omelse/anaconda3/envs/EnvPy38/bin/python3
 #Author: Okke Melse
 #Last modified: 2022-09-06
+import random
+import string
 import copy
 import re
 from Bio import SeqIO
@@ -11,13 +13,13 @@ import dash_bootstrap_components as dbc
 import matplotlib
 import matplotlib.pyplot as plt
 from utils.sequtils import sequence_info
-from utils.fileutils import _write_file, save_file, save_multiple_files
+from utils.fileutils import save_file, save_multiple_files, empty_tmpFiles
 import pandas as pd
 matplotlib.use("Agg")
 
 # This script aligns all sequenced genes to the library
 
-def parse_ab1(filename):
+def parse_ab1(filename, session_id="tmp"):
     """
     Parses ABI file(s) in biopython SeqIO record, and returns dictionary with channel readouts and FASTA
     :param filename: ABI filename (get from process_ab1)
@@ -36,10 +38,10 @@ def parse_ab1(filename):
         for frame in ORFs:
             tmpfasta.append(frame)
     # write all sequences concenated in one fasta file
-    with open("tmp-collectedFastaFiles.fasta", "w") as f:
+    with open(f"tmpFiles/{session_id}-collectedFastaFiles.fasta", "w") as f:
         for seq in tmpfasta:
             f.write(seq.format("fasta"))
-    libraryseqs_prot = sequence_info("tmp-collectedFastaFiles.fasta")
+    libraryseqs_prot = sequence_info(f"tmpFiles/{session_id}-collectedFastaFiles.fasta")
     return trace, libraryseqs_prot
 
 def _parse_single_ab1(filename):
@@ -66,7 +68,7 @@ def _parse_single_ab1(filename):
         translated_seqs.append(copy.deepcopy(record_copy))
     return trace, translated_seqs
 
-def parse_fasta(filename, translate=False):
+def parse_fasta(filename, session_id="tmp", translate=False):
     """
     Parses fasta file (with one or more sequences) in biopython SeqRecord
     :param filename: filename of fasta to parse
@@ -79,7 +81,7 @@ def parse_fasta(filename, translate=False):
     if type(filename) == str:
         filename = [filename]
 
-    with open("tmp-collectedFastaFiles.fasta", "w") as fwrite:
+    with open(f"tmpFiles/{session_id}-collectedFastaFiles.fasta", "w") as fwrite:
         for name in filename:
             all_sequences = SeqIO.parse(name, "fasta")
             record: SeqRecord
@@ -94,17 +96,17 @@ def parse_fasta(filename, translate=False):
                         fwrite.write(record_copy.format("fasta"))
                 else:
                     fwrite.write(record.format("fasta"))
-    libraryseqs = sequence_info("tmp-collectedFastaFiles.fasta")
+    libraryseqs = sequence_info(f"tmpFiles/{session_id}-collectedFastaFiles.fasta")
     return libraryseqs
 
-def plot_trace(trace):
+def plot_trace(trace, session_id="tmp"):
     # fig = plt.figure(facecolor="white", edgecolor="white", figsize=(7,3))
     # ax = fig.add_subplot(111)
     plt.plot(trace["CHANNEL1"][0:500], color="blue")
     plt.plot(trace["CHANNEL2"][0:500], color="red")
     plt.plot(trace["CHANNEL3"][0:500], color="green")
     plt.plot(trace["CHANNEL4"][0:500], color="yellow")
-    plt.savefig("tmpplot.png")
+    plt.savefig(f"tmpFiles/{session_id}-plot.png")
 
 ## DASHBOARD ##
 
@@ -124,9 +126,23 @@ layout = dbc.Container([
 
     html.Div([
 
+        html.Br(),
+
         html.P([
-                   "Upload here the sequencing DNA files (.fasta or .ab1), multiple files are allowed (keep ctrl pressed):\n",
-                   html.Br()]),
+            "File format of sequencing DNA files:"]),
+        dcc.Dropdown(options=['fasta', 'AB1'],
+                     value='fasta',
+                     placeholder="Select the file format",
+                     id="sequencing_format",
+                     className="d-grid gap-2",
+                     style={"width": '50%'},
+                     clearable=False
+                     ),
+
+        html.P([
+            html.Br(),
+            "Upload here the sequencing DNA files (.fasta or .ab1), multiple files are allowed (keep ctrl pressed):\n",
+            html.Br()]),
 
         dcc.Upload(id="upload-ab1",
                    children=html.Div([
@@ -145,15 +161,7 @@ layout = dbc.Container([
                    ),
         html.Div(id="filename1",
                  style={"color":"white"}),
-        html.Br(),
-        dcc.Dropdown(options=['fasta', 'AB1'],
-                     value='fasta',
-                     placeholder="Select the file format",
-                     id="sequencing_format",
-                     className="d-grid gap-2",
-                     style={"width": '80%'},
-                     clearable=False
-                     ),
+
         html.Br(),
 
         html.P([
@@ -224,34 +232,38 @@ def update_filenames(ab1filenames=None, libraryfilename=None):
     prevent_initial_call=True,
 )
 def process_seqalignment(n_clicks, ab1files, libraryfile, ab1filenames, libraryfilename, seq_fmt):
+    session_id = (''.join(random.choice(string.ascii_lowercase) for i in range(10)))
 
     filetype = "text" if seq_fmt == "fasta" else "binary"
 
     # Step 0: Some checks
     if None in [ab1files, libraryfile]:
-        return ["ERROR: upload both requested files."]
+        return ["", "ERROR: upload both requested files."]
 
     # Step 1a: Save sequencing (DNA) ABI/FASTA file to disk
     try:
-        _localfilenames_sequencing = save_multiple_files(ab1files, ab1filenames, filetype)
+        _localfilenames_sequencing = save_multiple_files(ab1files, ab1filenames, session_id, filetype)
     except:
+        empty_tmpFiles(session_id)
         return ["","Sequencing file could not be saved to disk, check if you selected the correct file type."]
 
     # Step 1b: Parse sequencing (DNA) ABI/FASTA file to disk
     seq_sequencing: sequence_info
     if seq_fmt == "AB1":
         try:
-            traces, seq_sequencing = parse_ab1(_localfilenames_sequencing)
+            traces, seq_sequencing = parse_ab1(_localfilenames_sequencing, session_id)
         except:
+            empty_tmpFiles(session_id)
             return ["","Sequencing file (AB1) could not be translated, probably no start codon was found."]
     else: #seq_fmt == "fasta"
         try:
-            seq_sequencing = parse_fasta(_localfilenames_sequencing, translate=True)
+            seq_sequencing = parse_fasta(_localfilenames_sequencing, session_id, translate=True)
         except:
+            empty_tmpFiles(session_id)
             return ["","Sequencing file (fasta) could not be translated, probably no start codon was found."]
 
     # Step 2: Save and parse library FASTA files to disk
-    _localfilename_library = save_file(libraryfile, libraryfilename)
+    _localfilename_library = save_file(libraryfile, libraryfilename, session_id)
     seq_library: SeqIO
     seq_library = SeqIO.parse(_localfilename_library, "fasta")
 
@@ -269,5 +281,6 @@ def process_seqalignment(n_clicks, ab1files, libraryfile, ab1filenames, libraryf
 
     df = pd.DataFrame(dataLibrary, columns=["Chimera", "Matched sequencing id", "Expected sequence (library)", "Translated sequencing result"])
 
+    empty_tmpFiles(session_id)
     return [dict(content=df.to_csv(index=False), filename="LibrarySequencingAnalysis.csv"),
             "Alignment successful, result will be downloaded automatically"]

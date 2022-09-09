@@ -1,1 +1,37 @@
-openpyxl == 3.0.10
+openpyxl == 3.0.10biopython @ file:///home/conda/feedstock_root/build_artifacts/biopython_1636053339432/work
+Bottleneck @ file:///opt/conda/conda-bld/bottleneck_1657175564434/work
+Brotli @ file:///home/conda/feedstock_root/build_artifacts/brotli-split_1648883617327/work
+certifi==2022.6.15
+click @ file:///home/conda/feedstock_root/build_artifacts/click_1651215151197/work
+cx-Freeze @ file:///home/conda/feedstock_root/build_artifacts/cx_freeze_1655883602442/work
+cycler @ file:///tmp/build/80754af9/cycler_1637851556182/work
+dash @ file:///home/conda/feedstock_root/build_artifacts/dash_1655171539375/work
+dash-bootstrap-components @ file:///home/conda/feedstock_root/build_artifacts/dash-bootstrap-components_1656527759387/work
+et-xmlfile==1.1.0
+Flask @ file:///home/conda/feedstock_root/build_artifacts/flask_1651670959703/work
+Flask-Compress @ file:///home/conda/feedstock_root/build_artifacts/flask-compress_1651163502372/work
+fonttools==4.25.0
+importlib-metadata @ file:///home/conda/feedstock_root/build_artifacts/importlib-metadata_1653252803161/work
+itsdangerous @ file:///home/conda/feedstock_root/build_artifacts/itsdangerous_1648147185463/work
+Jinja2 @ file:///home/conda/feedstock_root/build_artifacts/jinja2_1654302431367/work
+kiwisolver @ file:///opt/conda/conda-bld/kiwisolver_1653292039266/work
+MarkupSafe @ file:///home/conda/feedstock_root/build_artifacts/markupsafe_1648737547956/work
+matplotlib @ file:///tmp/build/80754af9/matplotlib-suite_1647441664166/work
+munkres==1.1.4
+numexpr @ file:///opt/conda/conda-bld/numexpr_1656940300424/work
+numpy @ file:///home/conda/feedstock_root/build_artifacts/numpy_1651020388975/work
+openpyxl==3.0.10
+packaging @ file:///tmp/build/80754af9/packaging_1637314298585/work
+pandas==1.4.3
+patchelf==0.15.0.0
+Pillow==9.2.0
+plotly @ file:///opt/conda/conda-bld/plotly_1646671701182/work
+pyparsing @ file:///tmp/build/80754af9/pyparsing_1635766073266/work
+python-dateutil @ file:///tmp/build/80754af9/python-dateutil_1626374649649/work
+pytz @ file:///opt/conda/conda-bld/pytz_1654762638606/work
+sip==4.19.13
+six @ file:///tmp/build/80754af9/six_1644875935023/work
+tenacity @ file:///home/conda/feedstock_root/build_artifacts/tenacity_1626090218611/work
+tornado @ file:///home/builder/ci_310/tornado_1640795392144/work
+Werkzeug @ file:///home/conda/feedstock_root/build_artifacts/werkzeug_1651670883478/work
+zipp @ file:///home/conda/feedstock_root/build_artifacts/zipp_1649012893348/work

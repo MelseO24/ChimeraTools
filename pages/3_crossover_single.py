@@ -4,12 +4,15 @@
 
 import sys
 import os
+import random
+import string
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 import dash
 from dash import Dash, dcc, Output, Input, State, html
 import dash_bootstrap_components as dbc
+from utils.fileutils import empty_tmpFiles
 
 # This script creates chimeric sequences out of parent sequences
 
@@ -38,6 +41,7 @@ class sequence_info:
         for fasta in self.fasta_seq:
             self.seqcounter += 1
             if fasta.id in self.seqdata.keys():
+                raise KeyError(f"FATAL: multiple sequences with id: '{fasta.id}' found!.")
                 sys.stderr.write(f"FATAL: multiple sequences with id: '{fasta.id}' found!.\n")
                 usage()
                 sys.exit(1)
@@ -83,7 +87,7 @@ def check_input(parent_seqs, crossover_pts):
     return 0
 
 def combine_fasta_files(fasta_files, fasta_out):
-    """ Reads in seperate fasta files, and creates a single file containing all sequences"""
+    """ Reads in separate fasta files, and creates a single file containing all sequences"""
     sequences = []
     for filename in fasta_files:
         _seq = SeqIO.parse(open(filename), 'fasta')
@@ -99,40 +103,38 @@ def write_file(filename, value):
     return 0
 
 ## Main ##
-def create_chimeric_sequence(parent_seq1, parent_seq2, crossover_pts):
-    parent_seqs = ["tmp-seq1.fasta", "tmp-seq2.fasta"]
-    if parent_seq1 == None:
-        return "INVALID input, add a fasta sequence in Sequence 1"
-    if parent_seq2 == None:
-        return "INVALID input, add a fasta sequence in Sequence 2"
-    write_file("tmp-seq1.fasta", parent_seq1)
-    write_file("tmp-seq2.fasta", parent_seq2)
+def create_chimeric_sequence(parent_seq1, parent_seq2, crossover_pts, session_id="tmp"):
+
+    parent_seqs = [f"tmpFiles/{session_id}-seq1.fasta", f"tmpFiles/{session_id}-seq2.fasta"]
+
+    write_file(parent_seqs[0], parent_seq1)
+    write_file(parent_seqs[1], parent_seq2)
     
-    #check_input(parent_seqs, crossover_pts)
-    #chimericSeq = The final sequence of the chimeric protein
+    # check_input(parent_seqs, crossover_pts)
     crossover_labels = [] #copy of crossover_pts with None replaced by 'end', for fasta header
     for cross_combi in crossover_pts:
         crossover_labels.append(["end" if value == None else value for value in cross_combi])
+
+    # chimericSeq = The final sequence of the chimeric protein
     chimericSeq = SeqRecord(Seq(""),
                             id="chimeric_protein",
                             description=f"Parents: {' '.join(str(e) for e in parent_seqs)} -- crossoverPts: {','.join(str(e) for e in crossover_labels)}"
                             )
 
     # Create temporary file containing all parent sequences
-    combine_fasta_files(parent_seqs, 'tmp-fasta.fasta')
+    combine_fasta_files(parent_seqs, f"tmpFiles/{session_id}-tmp-fasta.fasta")
 
     # Create chimeric protein
-    seqInfo = sequence_info('tmp-fasta.fasta')
+    seqInfo = sequence_info(f"tmpFiles/{session_id}-tmp-fasta.fasta")
     for seqid, crossoverPt in zip(seqInfo.get_all_ids(), crossover_pts):
         chimericSeq.seq += seqInfo.get_seq(seqid)[crossoverPt[0] : crossoverPt[1]]
     
     ## Write final chimeric sequence to file
     #SeqIO.write(chimericSeq, 'chimericSeq.fasta', 'fasta')
     
-    print("Done: chimeric sequence saved in file: chimericSeq.fasta")
-    
+    # print("Done: chimeric sequence saved in file: chimericSeq.fasta")
     return str(chimericSeq.format("fasta"))
-    #os.remove("tmp-fasta.fasta")
+
 
 
 ## DASHBOARD ##
@@ -181,10 +183,6 @@ layout = dbc.Container(
     
     html.Br(),
     
-    # html.Button('Submit and download chimeric fasta file',
-    #             id='submit-button',
-    #             n_clicks=0),
-    
     dbc.Button("Submit and download chimeric fasta file",
                color="primary",
                id="submit-button",
@@ -192,14 +190,6 @@ layout = dbc.Container(
                className="d-grid gap-2"),
     
     html.Br(),
-    
-    # html.Div([
-    #     "Enter fasta 2 here: ",
-    #     dcc.Input(id='fasta2',
-    #               placeholder="Enter here your fasta of sequence 2",
-    #               type='text',
-    #               size="80")
-    # ]),
 
     html.Div([dcc.Download(id="downloadFasta")]),
     
@@ -228,18 +218,34 @@ layout = dbc.Container(
     prevent_initial_call=True,
 )
 def calc_chimera(n_clicks, fasta1, fasta2, cut1, cut2):  # function arguments come from the component property of the Input
+    session_id = (''.join(random.choice(string.ascii_lowercase) for i in range(10)))
+
     if n_clicks < 1:
         return ""
     elif (cut1 == None) or (cut2 == None):
-        return(["", "Invalid, both crossover position 1 and 2 need to be provided", ""])
+        return ["", "Invalid, both crossover position 1 and 2 need to be provided", ""]
+    elif not fasta1:
+        return ["", "INVALID input, add a fasta sequence in Sequence 1", ""]
+    elif not fasta1.startswith(">"):
+        return ["", "INVALID input, sequence 1 is missing the fasta header '(>sequence)'", ""]
+    elif not fasta2:
+        return ["", "INVALID input, add a fasta sequence in Sequence 2", ""]
+    elif not fasta2.startswith(">"):
+        return ["", "INVALID input, sequence 2 is missing the fasta header '(>sequence)'", ""]
     else:
         crossover_pts = [[0,cut1], [cut2, None]]
-        #return f"{fasta1} {fasta2}"
-        return [dict(content=create_chimeric_sequence(fasta1, fasta2, crossover_pts),
+        try:
+            chimeric_seq = create_chimeric_sequence(fasta1, fasta2, crossover_pts, session_id)
+        except KeyError as error:
+            empty_tmpFiles(session_id)
+            return ["", error.args[0], ""]
+
+        empty_tmpFiles(session_id)
+
+        return [dict(content=chimeric_seq,
                     filename="chimericprotein.fasta"),
                 "Shuffling succeeded and download started",
                 f"Used cutting points, fasta1: 0-{cut1}, fasta2: {cut2}-end."]
-        #return f'Output: {fasta1} {fasta2}'  # returned objects are assigned to the component property of the Output
 
 # Run app
 if __name__=='__main__':

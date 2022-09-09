@@ -1,7 +1,8 @@
 #! /home/omelse/anaconda3/envs/AlphaFoldScripts/bin/python3
 #Author: Okke Melse
 #Last modified: 2022-02-09
-
+import random
+import string
 import sys
 import os
 import dash
@@ -13,20 +14,20 @@ import Bio.PDB as biopdb
 from dash import Dash, dcc, Output, Input, State, html
 import dash_bootstrap_components as dbc
 
-def process_pdbfiles(pdb_file):
+def process_pdbfiles(pdb_file, session_id):
     content_type, content_pdb = pdb_file.split(',')
     decoded_pdb = base64.b64decode(content_pdb)
-    with open("tmp-AFpdb.pdb", "w") as f:
+    with open(f"tmpFiles/{session_id}-AFpdb.pdb", "w") as f:
         f.write(decoded_pdb.decode("utf-8"))
     return 0
 
-def get_IDDT(fileName):
+def get_IDDT(fileName, session_id):
     # Get IDDT for each residue (saved in B-factor)
     residueNrs = []
     IDDT_values = []
     pdbparser = biopdb.PDBParser()
-    process_pdbfiles(fileName)
-    pdb_protein = pdbparser.get_structure("protein", "tmp-AFpdb.pdb")
+    process_pdbfiles(fileName, session_id)
+    pdb_protein = pdbparser.get_structure("protein", f"tmpFiles/{session_id}-AFpdb.pdb")
 
     # Only analyze first chain, remove others if present
     if len(list(pdb_protein.get_chains())) > 1:
@@ -91,6 +92,8 @@ layout = dbc.Container([
     prevent_initial_call=True,
 )
 def make_plot(pdb_inputs):
+    session_id = (''.join(random.choice(string.ascii_lowercase) for i in range(10)))
+
     ## matplotlib settings
     axistitleFont = {'fontname':'Arial', 'fontsize':12, 'fontweight':'normal'} #x-labels (set..)
     plt.rc('ytick', labelsize=12)
@@ -102,7 +105,7 @@ def make_plot(pdb_inputs):
     buf = io.BytesIO()
 
     p = []
-    resNRS, IDDT = get_IDDT(pdb_inputs)
+    resNRS, IDDT = get_IDDT(pdb_inputs, session_id)
     p.append(ax.plot(resNRS, IDDT, linewidth=1.0))
     ax.set_xlabel("ResidueNr", **axistitleFont)
     ax.set_ylabel("IDDT", **axistitleFont)
@@ -111,5 +114,7 @@ def make_plot(pdb_inputs):
     plt.savefig(buf, format="png")
     plt.close()
     data = base64.b64encode(buf.getbuffer()).decode("utf8")
-    os.remove("tmp-AFpdb.pdb")
+    for file in os.scandir('tmpFiles'):
+        if file.name.startswith(session_id):
+            os.remove(file)
     return ["data:image/png;base64,{}".format(data)]

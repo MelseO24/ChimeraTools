@@ -2,13 +2,15 @@
 #Author: Okke Melse
 #Last modified: 2022-09-08
 import sys
+import random
+import string
 from Bio import SeqIO, pairwise2
 from Bio.SeqRecord import SeqRecord
 from Bio.Seq import Seq
 import dash
 from dash import Dash, dcc, Output, Input, State, html, ctx, dash_table
 import dash_bootstrap_components as dbc
-from utils.fileutils import save_multiple_files
+from utils.fileutils import save_multiple_files, empty_tmpFiles
 import pandas as pd
 
 # This scripts trims sequences and creates consensus sequences (fwd, fwd; or fwd, rev)
@@ -234,11 +236,14 @@ def update_filenames(filenames1=None, filenames2=None):
     prevent_initial_call=True,
 )
 def trim_and_consensus(n_clicks, direction, seq1filenames, seq1filedatas, seq2filenames, seq2filedatas):
+    session_id = (''.join(random.choice(string.ascii_lowercase) for i in range(10)))
+
     # Step 1: Save files to disk
     try:
-        save_multiple_files(seq1filedatas, seq1filenames, filetype='binary')
-        save_multiple_files(seq2filedatas, seq2filenames, filetype='binary')
+        save_multiple_files(seq1filedatas, seq1filenames, session_id, filetype='binary')
+        save_multiple_files(seq2filedatas, seq2filenames, session_id, filetype='binary')
     except:
+        empty_tmpFiles(session_id)
         return ["", "", "Some files could not be saved to disk, please check if you uploaded .ab1 files."]
 
     # Step 2a: collect sequences which belong to each-other
@@ -246,23 +251,28 @@ def trim_and_consensus(n_clicks, direction, seq1filenames, seq1filedatas, seq2fi
         seq1_files: dict = get_basename(seq1filenames)
         seq2_files: dict = get_basename(seq2filenames)
     except RuntimeError as error:
+        empty_tmpFiles(session_id)
         return ["", "", error.args[0]]
 
     # Step 2b: check if all files have a counterpart (i.e. reverse or second fwd seq)
     for key in seq1_files.keys():
         if not key in seq2_files.keys():
+            empty_tmpFiles(session_id)
             return ["", "", f"ERROR: File with basename {key} not found in reverse/forward2 files."]
     for key in seq2_files.keys():
         if not key in seq1_files.keys():
+            empty_tmpFiles(session_id)
             return ["", "", f"ERROR: File with basename {key} not found in forward1 files."]
 
     # Step 3: parse all ab1 files
     consensus: list[list[str, str, str, str, str]]
     consensus = []  # lists all complement sequences
 
-    with open("consensus_seqs.fasta", "w") as f:
+    with open(f"consensus_seqs.fasta", "w") as f:
         for basename in seq1_files.keys():
-            seq1, seq2 = parse_ab1_v2(seq1_files[basename], seq2_files[basename], direction)
+            seq1, seq2 = parse_ab1_v2(f"tmpFiles/{session_id}-{seq1_files[basename]}",
+                                      f"tmpFiles/{session_id}-{seq2_files[basename]}",
+                                      direction)
             alignment = pairwise2.align.localms(seq1.seq, seq2.seq, 2, -1, -50, -5)
             warning = "Unreliable alignment" if len(alignment) > 1 else "No warning"
             consensus.append([seq1_files[basename],
@@ -275,9 +285,8 @@ def trim_and_consensus(n_clicks, direction, seq1filenames, seq1filedatas, seq2fi
     df = pd.DataFrame(consensus,
                       columns=["Seq1", "Seq2", "Warnings", "Consensus", "Alignment"])
 
+    empty_tmpFiles(session_id)
+
     return [dict(content=df.to_csv(index=False), filename="consensus_overview.csv"),
             dcc.send_file("consensus_seqs.fasta"),
             "Consensus sequences successfully computed, download should start shortly."]
-
-    # return [dcc.send_data_frame(df.to_excel, "consensus_seqs.xlsx", sheet_name="consensus"),
-    #         "Consensus sequences successfully computed, download should start shortly."]
