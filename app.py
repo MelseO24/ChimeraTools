@@ -15,6 +15,12 @@ SIDEBAR_STYLE = {
     # "background-color": "#f8f9fa",
 }
 
+CONTENT_STYLE = {
+    "margin-left": "18rem",
+    "margin-right": "2rem",
+    "padding": "1rem 1rem"
+}
+
 sidebar = html.Div(
     [
         html.H2("GlycoTools", className="display-4"),
@@ -39,17 +45,20 @@ app.layout = dbc.Container([
     html.Br(),
     sidebar,
     html.Br(),
-    dash.page_container,
+    html.Div([dash.page_container], style=CONTENT_STYLE),
     html.Footer(id = "footer",
         children = "\nCopyright CBR - Technical University of Munich.\nLast update: September 8th, 2022.",
-        style={"whiteSpace" : "pre"}
+        style={"whiteSpace" : "pre",
+               "margin-left": "18rem",
+               "margin-right": "2rem",
+               "padding": "1rem 1rem"}
         ),
-    html.A("CBR Website", href='https://www.cbr.cs.tum.de', target='blank')
+    html.A("CBR Website", href='https://www.cbr.cs.tum.de', target='blank', style=CONTENT_STYLE)
 ])
 
 # Run app
 if __name__=='__main__':
-    app.run_server(host='0.0.0.0')
+    app.run_server()
 
 #if __name__=='__main__':
 #    app.run_server(port=8052, debug=False)

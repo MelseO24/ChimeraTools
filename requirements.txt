@@ -1,7 +1,7 @@
 dash==2.6.1
-dash-core-components==2.6.1
+dash-core-components
 dash-bootstrap-components==1.2.1
 matplotlib==3.5.2
-biopython==1.78
-pandas=1.4.3
+biopython
+pandas==1.4.3
 numpy==1.21.5
