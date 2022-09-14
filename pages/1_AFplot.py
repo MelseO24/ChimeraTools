@@ -43,7 +43,7 @@ def get_IDDT(fileName, session_id):
     return residueNrs, IDDT_values
 
 ## DASHBOARD ##
-app = Dash(external_stylesheets=([dbc.themes.COSMO]))
+app = Dash(external_stylesheets=([dbc.themes.ZEPHYR]))
 dash.register_page(__name__,
                    title="Alphafold IDDT plot",
                    name="Generate Alphafold IDDT plot")

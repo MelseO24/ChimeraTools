@@ -140,7 +140,7 @@ def create_chimeric_sequence(parent_seq1, parent_seq2, crossover_pts, session_id
 ## DASHBOARD ##
 
 # Build your components
-app = Dash(external_stylesheets=([dbc.themes.COSMO]))
+app = Dash(external_stylesheets=([dbc.themes.ZEPHYR]))
 dash.register_page(__name__,
                    title="crossover_single",
                    name="In silico crossover - single")

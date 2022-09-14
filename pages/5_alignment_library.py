@@ -5,8 +5,9 @@ import random
 import string
 import copy
 import re
-from Bio import SeqIO
+from Bio import SeqIO, Align
 from Bio.SeqRecord import SeqRecord
+from Bio.Seq import Seq
 import dash
 from dash import Dash, dcc, Output, Input, State, html, ctx, dash_table
 import dash_bootstrap_components as dbc
@@ -18,6 +19,18 @@ import pandas as pd
 matplotlib.use("Agg")
 
 # This script aligns all sequenced genes to the library
+
+def get_nr_of_gaps(alignment: str, seq1: Seq, seq2: Seq):
+    """
+    Calculates number of gaps in pairwise sequence alignment
+    """
+    sequence_length = min(len(seq1), len(seq2)) # the maximum number of matches possible
+    nr_matches = alignment.count("|")
+    nr_mismatches = alignment.count(".")
+    nr_gaps = sequence_length - nr_matches - nr_mismatches
+    return nr_gaps
+
+
 
 def parse_ab1(filename, session_id="tmp"):
     """
@@ -111,7 +124,7 @@ def plot_trace(trace, session_id="tmp"):
 ## DASHBOARD ##
 
 # Build your components
-app = Dash(external_stylesheets=([dbc.themes.COSMO]))
+app = Dash(external_stylesheets=([dbc.themes.ZEPHYR]))
 dash.register_page(__name__,
                    title="Align sequenced library",
                    name="Analyze library sequencing")
@@ -125,6 +138,9 @@ layout = dbc.Container([
     html.Br(),
 
     html.Div([
+
+        html.Div("Note that this alignment is based on the translated AA sequence"
+                 " (translation of sequencing files is performed automatically."),
 
         html.Br(),
 
@@ -159,8 +175,7 @@ layout = dbc.Container([
                           },
                    multiple=True
                    ),
-        html.Div(id="filename1",
-                 style={"color":"white"}),
+        html.Em(id="filename1", className="text-info"),
 
         html.Br(),
 
@@ -183,15 +198,29 @@ layout = dbc.Container([
                           },
                    multiple=False
                    ),
-        html.Div(id="filename2",
-                 style={"color": "white"}),
+        html.Em(id="filename2", className="text-info"),
+
         html.Br(),
+        html.Br(),
+
+        html.Div("Select alignment method, global is generally recommended, \n"
+                 "'local' should only be used when the sequenced DNA is too short (e.g. only forward used)",
+                 style={"whiteSpace": "pre"}),
+
+        dcc.Dropdown(options=['global', 'local'],
+                     value='global',
+                     placeholder="Select alignment method",
+                     id="alignment_method",
+                     className="d-grid gap-2",
+                     style={"width": '50%'},
+                     clearable=False
+                     ),
     ]),
 
     # submit button
     html.Div([
         html.Br(),
-        dbc.Button("Submit and start alignment",
+        dbc.Button("Submit and start alignment (be patient, may take a while)",
                    color="primary",
                    id="submit-button2",
                    n_clicks=0,
@@ -199,6 +228,8 @@ layout = dbc.Container([
     ]),
 
         html.Div([dcc.Download(id="downloadAlignment")]),
+
+        html.Br(),
 
         html.Div(id="output_container_seqAlign",
                  style={"whiteSpace": "pre", "color": "red"}),
@@ -222,45 +253,49 @@ def update_filenames(ab1filenames=None, libraryfilename=None):
 # Callback to perform analysis
 @dash.callback(
     [Output(component_id='downloadAlignment', component_property='data'),
-     Output(component_id='output_container_seqAlign', component_property="children")],
+     Output(component_id='output_container_seqAlign', component_property="children"),
+     Output(component_id='output_container_seqAlign', component_property="className")],
     [Input(component_id='submit-button2', component_property='n_clicks')],
     [State(component_id='upload-ab1', component_property='contents'),
      State(component_id='upload-library', component_property='contents'),
      State(component_id='upload-ab1', component_property='filename'),
      State(component_id='upload-library', component_property='filename'),
-     State(component_id='sequencing_format', component_property='value')],
+     State(component_id='sequencing_format', component_property='value'),
+     State(component_id='alignment_method', component_property='value')],
     prevent_initial_call=True,
 )
-def process_seqalignment(n_clicks, ab1files, libraryfile, ab1filenames, libraryfilename, seq_fmt):
+def process_seqalignment(n_clicks, ab1files, libraryfile, ab1filenames, libraryfilename, seq_fmt, alignment_method):
     session_id = (''.join(random.choice(string.ascii_lowercase) for i in range(10)))
 
     filetype = "text" if seq_fmt == "fasta" else "binary"
 
     # Step 0: Some checks
     if None in [ab1files, libraryfile]:
-        return ["", "ERROR: upload both requested files."]
+        return ["", "ERROR: upload both requested files.", "text-danger"]
 
     # Step 1a: Save sequencing (DNA) ABI/FASTA file to disk
     try:
         _localfilenames_sequencing = save_multiple_files(ab1files, ab1filenames, session_id, filetype)
     except:
         empty_tmpFiles(session_id)
-        return ["","Sequencing file could not be saved to disk, check if you selected the correct file type."]
+        return ["","Sequencing file could not be saved to disk, check if you selected the correct file type.", "text-danger"]
 
-    # Step 1b: Parse sequencing (DNA) ABI/FASTA file to disk
+    # Step 1b: Parse sequencing (DNA) ABI/FASTA file
     seq_sequencing: sequence_info
     if seq_fmt == "AB1":
         try:
             traces, seq_sequencing = parse_ab1(_localfilenames_sequencing, session_id)
         except:
             empty_tmpFiles(session_id)
-            return ["","Sequencing file (AB1) could not be translated, probably no start codon was found."]
+            return ["","Sequencing file (AB1) could not be translated, probably no start codon was found,\n"
+                       "or some fasta sequences have identical names (see terminal output for a more detailed error message).", "text-danger"]
     else: #seq_fmt == "fasta"
         try:
             seq_sequencing = parse_fasta(_localfilenames_sequencing, session_id, translate=True)
         except:
             empty_tmpFiles(session_id)
-            return ["","Sequencing file (fasta) could not be translated, probably no start codon was found."]
+            return ["","Sequencing file (fasta) could not be translated, probably no start codon was found, \n"
+                       "or some fasta sequences have identical names (see terminal output for a more detailed error message).", "text-danger"]
 
     # Step 2: Save and parse library FASTA files to disk
     _localfilename_library = save_file(libraryfile, libraryfilename, session_id)
@@ -268,19 +303,64 @@ def process_seqalignment(n_clicks, ab1files, libraryfile, ab1filenames, libraryf
     seq_library = SeqIO.parse(_localfilename_library, "fasta")
 
     dataLibrary = []
+    aligner = Align.PairwiseAligner(mode=alignment_method,
+                                    match_score=2,
+                                    mismatch_score=-1,
+                                    target_internal_open_gap_score=-50,
+                                    target_internal_extend_gap_score=-5,
+                                    query_internal_open_gap_score=-50,
+                                    query_internal_extend_gap_score=-5,
+                                    target_left_open_gap_score=-50,
+                                    target_left_extend_gap_score=-5,
+                                    query_left_open_gap_score=-50,
+                                    query_left_extend_gap_score=-5,
+                                    )
     record: SeqRecord
     for record in seq_library:
-        matched_seq = ["No match", ""]  # [seqid, translated sequence]
+        found_exact_match = False
+        # Find exact match in library
         for seqid in seq_sequencing.get_all_ids():
             if seq_sequencing.get_seq(seqid) == record.seq:
-                matched_seq = [seqid, seq_sequencing.get_seq(seqid)]
+                matched_seq = [seqid, "max", "-", "-", seq_sequencing.get_seq(seqid)]
+                found_exact_match = True
+                continue
+        if not found_exact_match:
+            # find closest aligned library sequence
+            best_alignment = {"score": 0,
+                              "best_target": "",
+                              "alignment": "-"}
+            for seqid in seq_sequencing.get_all_ids():
+                alignments = aligner.align(record.seq, seq_sequencing.get_seq(seqid))
+                if alignments[0].score > best_alignment["score"]:
+                    best_alignment = {"score": alignments[0].score,
+                                      "best_target": seqid,
+                                      "alignment": str(alignments[0])}
+
+            matched_seq = [f"No exact match, best aligned with '{best_alignment['best_target']}'",
+                           best_alignment['score'],
+                           best_alignment['alignment'].count('.'),
+                           get_nr_of_gaps(str(best_alignment['alignment']),
+                                              record.seq,
+                                              seq_sequencing.get_seq(best_alignment['best_target'])),
+                           best_alignment['alignment']]
+
         dataLibrary.append([record.id,
                             matched_seq[0],  # seqid of matched sequencing result
+                            matched_seq[1],  # Alignment score
+                            matched_seq[2],  # Nr of mismatches in alignment
+                            matched_seq[3],  # Nr of gaps in alignment
                             record.seq,      # expected sequence from library
-                            matched_seq[1]]) # translated sequence from sequencing result
+                            matched_seq[4]]) # translated sequence from sequencing result
 
-    df = pd.DataFrame(dataLibrary, columns=["Chimera", "Matched sequencing id", "Expected sequence (library)", "Translated sequencing result"])
+    df = pd.DataFrame(dataLibrary, columns=["Chimera",
+                                            "Matched sequencing id",
+                                            "Alignment score",
+                                            "Mismatches",
+                                            "Gaps",
+                                            "Expected sequence (library)",
+                                            "Translated sequencing result or best alignment"])
 
     empty_tmpFiles(session_id)
     return [dict(content=df.to_csv(index=False), filename="LibrarySequencingAnalysis.csv"),
-            "Alignment successful, result will be downloaded automatically"]
+            "Alignment successful, result will be downloaded automatically",
+            "text-success"]

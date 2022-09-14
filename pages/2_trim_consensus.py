@@ -57,7 +57,7 @@ def make_consensus_seq(algn, seq1: SeqRecord, seq2: SeqRecord):
             seq2nr += 1
 
     consensus_record: SeqRecord = SeqRecord(Seq(''.join(consensus)),
-                                                id='Consensus-',
+                                                id=f"Consensus_{seq1.id}_{seq2.id}",
                                                 description=f"{seq1.id} and {seq2.id}")
     return consensus_record
 
@@ -71,11 +71,11 @@ def parse_ab1_v2(filename1, filename2, direction="ff"):
     seq_adi_1: SeqIO.AbiIO.AbiIterator = SeqIO.AbiIO.AbiIterator(filename1, trim=True)
     seq_adi_2: SeqIO.AbiIO.AbiIterator = SeqIO.AbiIO.AbiIterator(filename2, trim=True)
     seq1: SeqRecord = next(seq_adi_1)
-    seq1.id = filename1
+    seq1.id = ''.join(filename1.replace(" ","_").split("-")[1:])
     seq2: SeqRecord = next(seq_adi_2)
-    seq2.id = filename2
+    seq2.id = ''.join(filename2.replace(" ","_").split("-")[1:])
     if direction == "fr":
-        seq2 = seq2.reverse_complement(id=f"reverse_complement_of {seq2.id}")
+        seq2 = seq2.reverse_complement(id=f"reverse_complement_of_{seq2.id}")
     return seq1, seq2
 
 def get_basename(filenames):
@@ -100,7 +100,7 @@ def get_basename(filenames):
 
 ## DASHBOARD ##
 
-app = Dash(external_stylesheets=([dbc.themes.COSMO]))
+app = Dash(external_stylesheets=([dbc.themes.ZEPHYR]))
 dash.register_page(__name__,
                    title="Create consensus sequences",
                    name="Trimming and consensus sequences")
@@ -168,8 +168,7 @@ layout = dbc.Container([
                    multiple=True
                    ),
 
-        html.Div(id="out_filename1",
-                 style={"color": "white"}),
+        html.Em(id="out_filename1", className="text-info"),
 
         html.Br(),
 
@@ -189,8 +188,8 @@ layout = dbc.Container([
                    multiple=True
                    ),
 
-        html.Div(id="out_filename2",
-                 style={"color": "white"}),
+        html.Em(id="out_filename2", className="text-info"),
+
     ]),
 
     html.Div([
@@ -207,7 +206,7 @@ layout = dbc.Container([
 
     html.Br(),
     html.Div(id="output_msg_consensus",
-             style={"whiteSpace": "pre", "color": "red"}),
+             style={"whiteSpace": "pre"}),
 
 ])
 # Callback to show uploaded files
@@ -226,7 +225,8 @@ def update_filenames(filenames1=None, filenames2=None):
 @dash.callback(
     [Output(component_id='downloadoverview', component_property='data'),
      Output(component_id='downloadcconsensus', component_property='data'),
-     Output(component_id='output_msg_consensus', component_property='children')],
+     Output(component_id='output_msg_consensus', component_property='children'),
+     Output(component_id='output_msg_consensus', component_property='className')],
     [Input(component_id='submit-button-consensus', component_property='n_clicks')],
     [State(component_id='direction', component_property='value'),
      State(component_id='upload_seqs1', component_property='filename'),
@@ -244,7 +244,7 @@ def trim_and_consensus(n_clicks, direction, seq1filenames, seq1filedatas, seq2fi
         save_multiple_files(seq2filedatas, seq2filenames, session_id, filetype='binary')
     except:
         empty_tmpFiles(session_id)
-        return ["", "", "Some files could not be saved to disk, please check if you uploaded .ab1 files."]
+        return ["", "", "Some files could not be saved to disk, please check if you uploaded .ab1 files.", "text-danger"]
 
     # Step 2a: collect sequences which belong to each-other
     try:
@@ -252,17 +252,17 @@ def trim_and_consensus(n_clicks, direction, seq1filenames, seq1filedatas, seq2fi
         seq2_files: dict = get_basename(seq2filenames)
     except RuntimeError as error:
         empty_tmpFiles(session_id)
-        return ["", "", error.args[0]]
+        return ["", "", error.args[0], "text-danger"]
 
     # Step 2b: check if all files have a counterpart (i.e. reverse or second fwd seq)
     for key in seq1_files.keys():
         if not key in seq2_files.keys():
             empty_tmpFiles(session_id)
-            return ["", "", f"ERROR: File with basename {key} not found in reverse/forward2 files."]
+            return ["", "", f"ERROR: File with basename {key} not found in reverse/forward2 files.", "text-danger"]
     for key in seq2_files.keys():
         if not key in seq1_files.keys():
             empty_tmpFiles(session_id)
-            return ["", "", f"ERROR: File with basename {key} not found in forward1 files."]
+            return ["", "", f"ERROR: File with basename {key} not found in forward1 files.", "text-danger"]
 
     # Step 3: parse all ab1 files
     consensus: list[list[str, str, str, str, str]]
@@ -289,4 +289,5 @@ def trim_and_consensus(n_clicks, direction, seq1filenames, seq1filedatas, seq2fi
 
     return [dict(content=df.to_csv(index=False), filename="consensus_overview.csv"),
             dcc.send_file("consensus_seqs.fasta"),
-            "Consensus sequences successfully computed, download should start shortly."]
+            "Consensus sequences successfully computed, download should start shortly.",
+            "text-success"]

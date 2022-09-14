@@ -3,7 +3,7 @@ from dash import Dash, dcc, Output, Input, State, html
 import dash_bootstrap_components as dbc
 
 # Build your components
-app = Dash(external_stylesheets=([dbc.themes.COSMO]))
+app = Dash(external_stylesheets=([dbc.themes.ZEPHYR]))
 dash.register_page(__name__,
                    path='/',
                    title="Homepage",

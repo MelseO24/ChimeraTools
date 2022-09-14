@@ -1,9 +1,9 @@
 import dash
-from dash import Dash, html, dcc, Output, Input
+from dash import Dash, html
 import dash_bootstrap_components as dbc
 
 
-app = Dash(__name__, use_pages=True, external_stylesheets=([dbc.themes.SOLAR]))
+app = Dash(__name__, use_pages=True, external_stylesheets=([dbc.themes.ZEPHYR]))
 
 SIDEBAR_STYLE = {
     "position": "fixed",

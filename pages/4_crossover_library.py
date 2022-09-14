@@ -119,7 +119,7 @@ def calc_library(msa, crossPts, label="full"):
 ## DASHBOARD ##
 
 # Build components
-app = Dash(external_stylesheets=([dbc.themes.COSMO]))
+app = Dash(external_stylesheets=([dbc.themes.ZEPHYR]))
 dash.register_page(__name__,
                    title="crossover_library",
                    name="In silico crossover - library")
