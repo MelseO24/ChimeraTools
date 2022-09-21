@@ -20,7 +20,10 @@ class sequence_info:
         print(f"Analyzed {self.seqcounter} sequences.")
 
     def get_seq(self, seqid):
-        return self.seqdata[seqid]
+        if seqid in self.seqdata.keys():
+            return self.seqdata[seqid]
+        else:
+            return ""
 
     def get_length(self, seqid):
         return len(self.seqdata[seqid])

@@ -19,12 +19,8 @@ from Bio.SeqRecord import SeqRecord
 import dash
 from dash import Dash, dcc, Output, Input, State, html
 import dash_bootstrap_components as dbc
+from utils.fileutils import save_file, empty_tmpFiles
 
-def write_file(filename, value):
-    f = open(filename, 'w')
-    f.write(value)
-    f.close()
-    return 0
 
 def show_crossover_positions_in_alignment(msa, crossPts):
     """
@@ -131,10 +127,26 @@ layout = dbc.Container(
         html.Div(
             html.H1("Create libraries of chimeric proteins", style={'ext-align': 'center'})),
         # input MSA
-        html.P(["Enter here the MSA (Clustal format):", html.Br()]),
-        dcc.Textarea(id='msa_input',
-                  placeholder="Enter here your MSA in a supported format",
-                  style={'width' : '80%', 'height' : 250}),
+        html.P(["Enter here the MSA (e.g. at Clustal website: click 'Download Alignment File'):",
+                html.Br()]),
+
+        dcc.Upload(id="upload_msa_input",
+                   children=html.Div([
+                       'Upload here your MSA in a supported format  (Drag and Drop or click to Select Files)'
+                   ]),
+                   style={'width': '100%',
+                          'height': '60px',
+                          'lineHeight': '60px',
+                          'borderWidth': '1px',
+                          'borderStyle': 'dashed',
+                          'borderRadius': '5px',
+                          'textAlign': 'center',
+                          'margin': '10px'
+                          },
+                   multiple=False
+                   ),
+        html.Em(id="filename_msa1", className="text-info"),
+
         html.Br(),
         html.Br(),
         dcc.Dropdown(options=['Clustal','emboss','fasta'],
@@ -176,18 +188,27 @@ layout = dbc.Container(
         html.Div([dcc.Download(id="downloadFasta1")]),
         html.Br(),
         #Write cutting points
-        html.Div(id='output_container1',
+        html.Em(id='output_container1', className="text-info",
                  style={"whiteSpace" : "pre",
-                        "color": "red"})
+                        "font-family": "monospace"})
 
     ]),
 
 )
+
+@dash.callback(
+    Output(component_id="filename_msa1", component_property="children"),
+    Input(component_id="upload_msa_input", component_property="filename")
+)
+def update_filename(filename_msa):
+    # If upload triggered callback, show which file was uploaded, but do not start library creation.
+    return filename_msa
+
 @dash.callback(
     [Output(component_id="downloadFasta1", component_property="data"),
      Output(component_id="output_container1", component_property="children")],
     [Input(component_id="submit-button1", component_property="n_clicks")],
-    [State(component_id="msa_input", component_property="value"),
+    [State(component_id="upload_msa_input", component_property="contents"),
      State(component_id="crossPts", component_property="value"),
      State(component_id="alignment_format", component_property="value"),
      State(component_id="annotation", component_property="value")],
@@ -203,13 +224,15 @@ def create_library(n_clicks, msa_input, crossPts_input, alignment_format, annota
     elif len(crossPts_input.split(",")) < 2:
         return ["", "ERROR: provide at least two crossover points, otherwise use the 'In silico crossover - single' script"]
 
-    write_file(f"tmpFiles/{session_id}-msa.aln", msa_input)
+    filename_msa_input = save_file(msa_input, "input_MSA_for_library.fasta", session_id)
+
     try:
-        align = AlignIO.read(f"tmpFiles/{session_id}-msa.aln", alignment_format.lower())
-    except ValueError:
-        os.remove(f"tmpFiles/{session_id}-msa.aln")
+        align = AlignIO.read(filename_msa_input, alignment_format.lower())
+    except:
+        empty_tmpFiles(session_id)
         return ["", f"ERROR: MSA could not be parsed as {alignment_format} alignment. Are you sure you provided the correct format?\n"]
-    os.remove(f"tmpFiles/{session_id}-msa.aln")
+
+    empty_tmpFiles(session_id)
     crossPts_input = crossPts_input.split(",")
     crossPts = [int(x)-1 for x in crossPts_input]
     crossPts.sort()
@@ -224,3 +247,5 @@ def create_library(n_clicks, msa_input, crossPts_input, alignment_format, annota
 if __name__=='__main__':
     app.run(host='0.0.0.0')
     #app.run_server(port=8052, debug=False)
+
+

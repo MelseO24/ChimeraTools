@@ -220,6 +220,7 @@ layout = dbc.Container([
     # submit button
     html.Div([
         html.Br(),
+        html.Em("Calculation may take a while, as long as the active tab is called 'Updating...', the script is running."),
         dbc.Button("Submit and start alignment (be patient, may take a while)",
                    color="primary",
                    id="submit-button2",
