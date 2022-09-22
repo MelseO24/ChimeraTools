@@ -9,13 +9,14 @@ from Bio import SeqIO, Align
 from Bio.SeqRecord import SeqRecord
 from Bio.Seq import Seq
 import dash
-from dash import Dash, dcc, Output, Input, State, html, ctx, dash_table
+from dash import Dash, dcc, Output, Input, State, html
 import dash_bootstrap_components as dbc
 import matplotlib
 import matplotlib.pyplot as plt
 from utils.sequtils import sequence_info
 from utils.fileutils import save_file, save_multiple_files, empty_tmpFiles
 import pandas as pd
+from io import BytesIO
 matplotlib.use("Agg")
 
 # This script aligns all sequenced genes to the library
@@ -362,6 +363,13 @@ def process_seqalignment(n_clicks, ab1files, libraryfile, ab1filenames, libraryf
                                             "Translated sequencing result or best alignment"])
 
     empty_tmpFiles(session_id)
-    return [dict(content=df.to_csv(index=False), filename="LibrarySequencingAnalysis.csv"),
+
+    in_memory_excel = BytesIO()
+    df.to_excel(in_memory_excel, index=False)
+    return [dcc.send_data_frame(df.to_excel, "library_vs_sequencing.xlsx", index=False, sheet_name="analysis"),
             "Alignment successful, result will be downloaded automatically",
             "text-success"]
+
+    # return [dict(content=df.to_csv(index=False), filename="LibrarySequencingAnalysis.csv"),
+    #         "Alignment successful, result will be downloaded automatically",
+    #         "text-success"]
