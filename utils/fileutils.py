@@ -37,4 +37,7 @@ def save_multiple_files(files, filenames, session_id="tmp", filetype='text'):
 def empty_tmpFiles(session_id):
     for file in os.scandir('tmpFiles'):
         if file.name.startswith(session_id):
-            os.remove(file)
+            try:
+                os.remove(file)
+            except:
+                print(f"{file} could not be removed")
