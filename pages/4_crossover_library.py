@@ -62,7 +62,7 @@ def merge_sequences(sequences):
     merged_seq = re.sub('-', '', merged_seq)
     return merged_seq
 
-def calc_library(msa, crossPts, label="full"):
+def calc_library(msa, crossPts, annotation="full"):
     """
     Returns fasta files of all sequences resulting from shuffling
 
@@ -102,9 +102,8 @@ def calc_library(msa, crossPts, label="full"):
     for sequence, seqindex in zip(shuffled_fragments, shuffled_seq_index):
         all_chimeric_seqs.append(SeqRecord(Seq(merge_sequences(sequence))))
         chimeraname = ''.join([str(x+1) for x in seqindex])
-        if label == "full":
-            label = ":".join([f"{chimeraname}:"
-                              f"frag{fragNr+1}={seqids[seqind]}" for fragNr, seqind in enumerate(seqindex)])
+        if annotation == "full":
+            label = chimeraname + ":" + ":".join([f"frag{fragNr+1}={seqids[seqind]}" for fragNr, seqind in enumerate(seqindex)])
         else:
             label = chimeraname
         all_chimeric_seqs[-1].id = label

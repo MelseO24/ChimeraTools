@@ -226,11 +226,13 @@ layout = dbc.Container([
                  "'sequencing': algorithm searches for each consensus sequence the best-matching library protein sequence.\n",
                  style={"whiteSpace": "pre"}),
 
-        dcc.Dropdown(options=['library', 'sequencing'],
+        dcc.Dropdown(options=[{"label": "Match each library entry", "value": "library"},
+                              {"label": "Match each sequencing result, show only top-scored ORF", "value": "sequencing-topScoredORF"},
+                              {"label": "Match each sequencing result, show all ORFs", "value": "sequencing-allORF"}],
                      value='library',
                      id="search_target",
                      className="d-grid gap-2",
-                     style={"width": '50%'},
+                     style={"width": '80%'},
                      clearable=False
                      ),
 
@@ -364,7 +366,7 @@ def process_seqalignment(n_clicks, ab1files, libraryfile, ab1filenames, libraryf
             if not found_exact_match:
                 # find closest aligned sequencing sequence
                 best_alignment = {"score": 0,
-                                  "best_target": "",
+                                  "best_target": "No match",
                                   "alignment": "-"}
                 for seqid in seq_sequencing.get_all_ids():
                     alignment = do_alignment(record.seq, seq_sequencing.get_seq(seqid), seqid, aligner)
@@ -376,7 +378,7 @@ def process_seqalignment(n_clicks, ab1files, libraryfile, ab1filenames, libraryf
                     #                       "best_target": seqid,
                     #                       "alignment": str(alignments[0])}
 
-                matched_seq = [f"No exact match, best aligned with '{best_alignment['best_target']}'",
+                matched_seq = [f"No exact match, best aligned with: {best_alignment['best_target']}",
                                best_alignment['score'],
                                best_alignment['alignment'].count('.'),
                                get_nr_of_gaps(str(best_alignment['alignment']),
@@ -386,11 +388,11 @@ def process_seqalignment(n_clicks, ab1files, libraryfile, ab1filenames, libraryf
 
             dataLibrary.append(create_df_entry(record.id, record.seq, matched_seq))
 
-    else: #search_target = 'sequencing'
-        last_basename_matched = ""
+    else: #search_target = 'sequencing-topScoredORF' or 'sequencing-allORF'
+        last_basename_exact_matched = ""
         for seqid in seq_sequencing.get_all_ids():
             basename = "".join(seqid.split("-")[:-1])
-            if basename == last_basename_matched:  # if a ORF already had an exact match, we do not need to analyze the other ORFs
+            if basename == last_basename_exact_matched:  # if a ORF already had an exact match, we do not need to analyze the other ORFs
                 continue
             found_exact_match = False
             seq_library = list(seq_library) # as we cannot iterate twice over an iterator
@@ -398,29 +400,38 @@ def process_seqalignment(n_clicks, ab1files, libraryfile, ab1filenames, libraryf
                 if seq_sequencing.get_seq(seqid) == record.seq:
                     matched_seq = [record.id, "max", "-", "-", record.seq]
                     found_exact_match = True
-                    last_basename_matched = basename
+                    last_basename_exact_matched = basename
                     continue
             if not found_exact_match:
                 # find closest aligned library sequence
                 best_alignment = {"score": 0,
-                                  "best_target": "",
+                                  "best_target": "No match",
                                   "alignment": "-"}
-                best_seqid = ""
+                best_seq = ""
                 for record in seq_library:
                     alignment = do_alignment(seq_sequencing.get_seq(seqid), record.seq, record.id, aligner)
                     if alignment["score"] > best_alignment["score"]:
                         best_alignment = alignment
-                        best_seqid = record.id
+                        best_seq = record.seq
 
-                matched_seq = [f"No exact match, best aligned with '{best_alignment['best_target']}'",
+                matched_seq = [f"No exact match, best aligned with: {best_alignment['best_target']}",
                                best_alignment['score'],
                                best_alignment['alignment'].count('.'),
                                get_nr_of_gaps(str(best_alignment['alignment']),
-                                                  best_seqid,
+                                                  best_seq,
                                                   seq_sequencing.get_seq(seqid)),
                                best_alignment['alignment']]
 
             dataLibrary.append(create_df_entry(seqid, seq_sequencing.get_seq(seqid), matched_seq))
+
+        # If requested, only list best-alignment ORF for each sequence
+        if search_target == "sequencing-topScoredORF":
+            unique_seqids = {''.join(seqid.split("-")[:-1]) for seqid in seq_sequencing.get_all_ids()}
+            for seqid in unique_seqids:
+                _matches = [x for x in dataLibrary if seqid in x[0]]
+                _matches.sort(key=lambda entry: entry[2], reverse=True)
+                for entry in _matches[1:]:  # keep top-scored entry, and remove remainder from dataLibrary
+                    dataLibrary.remove(entry)
 
     df = pd.DataFrame(dataLibrary, columns=["Chimera" if search_target == "library" else "SeqID - ORF",
                                             "Matched sequencing id" if search_target == "library" else "Matched library id",
@@ -433,11 +444,11 @@ def process_seqalignment(n_clicks, ab1files, libraryfile, ab1filenames, libraryf
     in_memory_excel = BytesIO()
     df.to_excel(in_memory_excel, index=False)
     empty_tmpFiles(session_id)
-    return [dcc.send_data_frame(df.to_excel, "library_vs_sequencing.xlsx", index=False, sheet_name="analysis"),
+    filename_out = "library_vs_sequencing.xlsx" if search_target == "library" else "sequencing_vs_library.xlsx"
+    return [dcc.send_data_frame(df.to_excel, filename_out, index=False, sheet_name="analysis"),
             "Alignment successful, result will be downloaded automatically",
             "text-success"]
 
     # return [dict(content=df.to_csv(index=False), filename="LibrarySequencingAnalysis.csv"),
     #         "Alignment successful, result will be downloaded automatically",
     #         "text-success"]
-
