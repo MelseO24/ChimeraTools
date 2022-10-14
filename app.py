@@ -47,7 +47,7 @@ app.layout = dbc.Container([
     html.Br(),
     html.Div([dash.page_container], style=CONTENT_STYLE),
     html.Footer(id = "footer",
-        children = "\nCopyright CBR - Technical University of Munich.\nLast update: September 8th, 2022.",
+        children = "\nCopyright CBR - Technical University of Munich.\nLast update: August 14th, 2022.",
         style={"whiteSpace" : "pre",
                "margin-left": "18rem",
                "margin-right": "2rem",
@@ -58,8 +58,8 @@ app.layout = dbc.Container([
 
 # Run app
 if __name__=='__main__':
-    app.run(host="0.0.0.0")
-    # app.run_server(port=5081)
+    # app.run(host="0.0.0.0")
+    app.run_server(port=5081)
 
 #if __name__=='__main__':
 #    app.run_server(port=8052, debug=False)

@@ -372,11 +372,6 @@ def process_seqalignment(n_clicks, ab1files, libraryfile, ab1filenames, libraryf
                     alignment = do_alignment(record.seq, seq_sequencing.get_seq(seqid), seqid, aligner)
                     if alignment["score"] > best_alignment["score"]:
                         best_alignment = alignment
-                    # alignments = aligner.align(record.seq, seq_sequencing.get_seq(seqid))
-                    # if alignments[0].score > best_alignment["score"]:
-                    #     best_alignment = {"score": alignments[0].score,
-                    #                       "best_target": seqid,
-                    #                       "alignment": str(alignments[0])}
 
                 matched_seq = [f"No exact match, best aligned with: {best_alignment['best_target']}",
                                best_alignment['score'],
