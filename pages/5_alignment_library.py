@@ -360,7 +360,7 @@ def process_seqalignment(n_clicks, ab1files, libraryfile, ab1filenames, libraryf
             # Find exact match in library
             for seqid in seq_sequencing.get_all_ids():
                 if seq_sequencing.get_seq(seqid) == record.seq:
-                    matched_seq = [seqid, "max", "-", "-", seq_sequencing.get_seq(seqid)]
+                    matched_seq = [seqid, "identical", "-", "-", seq_sequencing.get_seq(seqid)]
                     found_exact_match = True
                     continue
             if not found_exact_match:
@@ -393,7 +393,7 @@ def process_seqalignment(n_clicks, ab1files, libraryfile, ab1filenames, libraryf
             seq_library = list(seq_library) # as we cannot iterate twice over an iterator
             for record in seq_library:
                 if seq_sequencing.get_seq(seqid) == record.seq:
-                    matched_seq = [record.id, "max", "-", "-", record.seq]
+                    matched_seq = [record.id, "identical", "-", "-", record.seq]
                     found_exact_match = True
                     last_basename_exact_matched = basename
                     continue

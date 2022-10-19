@@ -85,9 +85,6 @@ layout = dbc.Container([
 
 @dash.callback(
     [Output(component_id="show_plot", component_property="src")],
-    # Output(component_id="output_container2", component_property="children")],
-    #[Input(component_id="submit-button-AF", component_property="n_clicks")],
-    #[State(component_id="pdb_input", component_property="value")]
     [Input(component_id='upload-pdb', component_property="contents")],
     prevent_initial_call=True,
 )
